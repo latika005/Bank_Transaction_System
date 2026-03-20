@@ -53,7 +53,7 @@ async function CreateTransactionController(req, res){
 
     if(transactionAlreadyExists){
         return res.status(200).json({
-            message : "Transaction  already proceeded",
+            message : "Transaction already proceeded",
             transaction : transactionAlreadyExists,
         })
     }
@@ -117,39 +117,54 @@ async function CreateTransactionController(req, res){
     /*
     5. Create transaction (PENDING)
     */ 
-   const session = await mongoose.startSession()
-   session.startTransaction(); // a session is a context that groups multiple database operations together.
-   // The use of startTransaction and session allows us to group multiple database operations into a single unit of work.
-   //  If any operation within the transaction fails, we can roll back all changes made during the transaction, 
-   // ensuring data integrity and consistency.
-    const [transaction] = await transactionModel.create([{
-        fromAccount,
-        toAccount,
-        amount,
-        idempotencyKey,
-        status : "PENDING",
-    }], 
-    { session })
-
-    const debitLedgerEntry = await ledgerModel.create({
-        account : fromAccount,
-        amount : amount,
-        transaction : transaction._id,
-        type : 'DEBIT',
-    },{session})
-
-    const creditLedgerEntry = await ledgerModel.create({
-        account : toAccount,
-        amount : amount,
-        transaction : transaction._id,
-        type : 'CREDIT',
-    }, { session })
-
-    transaction.status = 'COMPLETED'
-    await transaction.save({ session }) 
-
-    await session.commitTransaction()
-    session.endSession();
+   let transaction;
+    try{
+        const session = await mongoose.startSession()
+        session.startTransaction(); // a session is a context that groups multiple database operations together.
+        // The use of startTransaction and session allows us to group multiple database operations into a single unit of work.
+        //  If any operation within the transaction fails, we can roll back all changes made during the transaction, 
+        // ensuring data integrity and consistency.
+         transaction = ( await transactionModel.create([{
+             fromAccount,
+             toAccount,
+             amount,
+             idempotencyKey,
+             status : "PENDING",
+         }], { session }) )[0] // create returns an array of created documents, we need to access the first element to get the transaction document
+     
+         const debitLedgerEntry = await ledgerModel.create([{
+             account : fromAccount,
+             amount : amount,
+             transaction : transaction._id,
+             type : 'DEBIT',
+         }] ,{session})
+     
+         const creditLedgerEntry = await ledgerModel.create([{
+             account : toAccount,
+             amount : amount,
+             transaction : transaction._id,
+             type : 'CREDIT',
+         }], { session })
+     
+         await transactionModel.findOneAndUpdate(
+             { _id : transaction._id },
+             { status : "COMPLETED" },
+             { session }
+         )
+     
+         await session.commitTransaction()
+         session.endSession();
+    }catch(error){
+        await transactionModel.findOneAndUpdate(
+            { idempotencyKey : idempotencykey },
+            { status : "FAILED" }
+        )
+        return res.status(500).json({
+            message : "Transaction failed due to internal error",
+            error : error.message,
+        })
+    }
+ 
 
     /*
     10. Send email notification
@@ -188,7 +203,6 @@ async function createInitialFundsTransaction(req, res){
         // and they can only create initial funds transactions for their own system account
 
     const fromUserAccount = await accountModel.findOne({
-        // systemUser : true,
         user : req.user._id, 
     })
     if(!fromUserAccount){
@@ -206,24 +220,24 @@ async function createInitialFundsTransaction(req, res){
         toAccount,
         amount,
         idempotencyKey,
-        status : "COMPLETED",
+        status : "PENDING",
     })
 
-    const debitLedgerEntry = await ledgerModel.create([{
-        account : toAccount,
-        amount : amount,
-        transaction : transaction._id,
-        type : "DEBIT",
-    }], { session })
-
     const creditLedgerEntry = await ledgerModel.create([{
-        account : fromUserAccount._id,
+        account : toAccount,
         amount : amount,
         transaction : transaction._id,
         type : "CREDIT",
     }], { session })
 
-    // transaction.status = "COMPLETED";
+    const debitLedgerEntry = await ledgerModel.create([{
+        account : fromUserAccount._id,
+        amount : amount,
+        transaction : transaction._id,
+        type : "DEBIT",
+    }], { session })
+
+    transaction.status = "COMPLETED";
     await transaction.save({ session })
 
     await session.commitTransaction();
