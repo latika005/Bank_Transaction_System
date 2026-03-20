@@ -24,7 +24,7 @@ const authRouter = require('./routes/auth.routes');
 const accountRouter = require('./routes/account.routes');
 const transactionRoutes = require('./routes/transaction.routes');
 
-app.use("/", (req, res) => {
+app.get("/", (req, res) => {
     console.log("Server is running");
     res.send("Server is running");
 })
