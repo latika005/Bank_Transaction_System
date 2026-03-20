@@ -15,7 +15,7 @@ const transactionSchema = new mongoose.Schema({
     },
     transactionStatus : {
         type : String,
-        eum : {
+        enum : {
             values : ["PENDING", "COMPLETED", "FAILED"],
             message : "Transaction status can be PENDING, COMPLETED or FAILED",
         }
@@ -23,7 +23,7 @@ const transactionSchema = new mongoose.Schema({
     amount : {
         type : Number,
         required : [true, "Transaction amount is required"],
-        min : [0,`Transaction amount cannot be negative, got ${v}`]
+        min : [1, "Transaction must be greater than 0"]
     },
     idempotencyKey : {
         type : String,
@@ -35,6 +35,6 @@ const transactionSchema = new mongoose.Schema({
     timestamps : true,
 })
 
-const transactionModel = mongoose.Schema("transaction", transactionSchema);
+const transactionModel = mongoose.model("transaction", transactionSchema);
 
 module.exports = transactionModel;

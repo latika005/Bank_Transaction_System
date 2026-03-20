@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+//  Ledger means "the master record-keeping system, either digital or physical,
+//  that records all financial transactions (debits and credits) in chronological order,
+//  acting as the foundation of accounting)"
 
 const ledgerSchema = new mongoose.Schema({
     account : {
@@ -41,10 +44,8 @@ function preventLedgerModification(){
 ledgerSchema.pre('findOneAndUpdate', preventLedgerModification);
 ledgerSchema.pre('updateOne', preventLedgerModification);
 ledgerSchema.pre('deleteMany', preventLedgerModification);
-ledgerSchema.pre('remove', preventLedgerModification);
 ledgerSchema.pre('deleteOne', preventLedgerModification);
 ledgerSchema.pre('updateMany', preventLedgerModification);
-ledgerSchema.pre('save', preventLedgerModification);
 ledgerSchema.pre('findOneAndDelete', preventLedgerModification);
 ledgerSchema.pre('findOneAndReplace', preventLedgerModification);
 

@@ -2,6 +2,7 @@ const transactionModel = require("../models/transaction.model");
 const ledgerModel = require("../models/ledger.model");
 const emailService = require("../services/email.service");
 const accountModel = require("../models/account.model");
+const mongoose = require("mongoose");
 
 
 /**
@@ -105,11 +106,137 @@ async function CreateTransactionController(req, res){
     4. Derive sender balance from ledger 
     */
 
-    
-     
+    const balance = await fromUserAccount.getBalance();
+
+    if(balance < amount){
+        return res.status(400).json({
+            message :` Insufficient balance in sender account. Current balance is ${balance}, Requested balance is ${amount}`
+        })
+    }
+
+    /*
+    5. Create transaction (PENDING)
+    */ 
+   const session = await mongoose.startSession()
+   session.startTransaction(); // a session is a context that groups multiple database operations together.
+   // The use of startTransaction and session allows us to group multiple database operations into a single unit of work.
+   //  If any operation within the transaction fails, we can roll back all changes made during the transaction, 
+   // ensuring data integrity and consistency.
+    const [transaction] = await transactionModel.create([{
+        fromAccount,
+        toAccount,
+        amount,
+        idempotencyKey,
+        status : "PENDING",
+    }], 
+    { session })
+
+    const debitLedgerEntry = await ledgerModel.create({
+        account : fromAccount,
+        amount : amount,
+        transaction : transaction._id,
+        type : 'DEBIT',
+    },{session})
+
+    const creditLedgerEntry = await ledgerModel.create({
+        account : toAccount,
+        amount : amount,
+        transaction : transaction._id,
+        type : 'CREDIT',
+    }, { session })
+
+    transaction.status = 'COMPLETED'
+    await transaction.save({ session }) 
+
+    await session.commitTransaction()
+    session.endSession();
+
+    /*
+    10. Send email notification
+    */
+   await emailService.sendTransactionEmail(req.user.email, req.user.name, amount, toAccount)
+
+   return res.status(201).json({
+    message : "Transaction completed successfully",
+    transaction: transaction,
+   })
 }
 
-modules.exports = {
+async function createInitialFundsTransaction(req, res){
+   const { toAccount, amount, idempotencyKey } = req.body;
+
+   if(!toAccount || !amount || !idempotencyKey){
+    return res.status(400).json({
+        message : "toAccount, amount and idempotencyKey are required"})
+    }
+
+    const toUserAccount = await accountModel.findOne({
+        _id : toAccount,
+    })
+
+    if(!toUserAccount){
+        return res.status(400).json({
+            message : "Invalid toAccount"
+        })
+    }
+
+    // look in the middlware, we are attaching the user 
+        // to the request object, so we can use it here to 
+        // find the system account associated with the 
+        // user who is making the request
+        // this is to ensure that only system users can create initial funds transactions, 
+        // and they can only create initial funds transactions for their own system account
+
+    const fromUserAccount = await accountModel.findOne({
+        // systemUser : true,
+        user : req.user._id, 
+    })
+    if(!fromUserAccount){
+        return res.status(400).json({
+            message : "System account not found for the user"
+        })
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+// whenever we use 'session', we need to pass the data in the form of an array
+
+    const transaction = new transactionModel({
+        fromAccount : fromUserAccount._id,
+        toAccount,
+        amount,
+        idempotencyKey,
+        status : "COMPLETED",
+    })
+
+    const debitLedgerEntry = await ledgerModel.create([{
+        account : toAccount,
+        amount : amount,
+        transaction : transaction._id,
+        type : "DEBIT",
+    }], { session })
+
+    const creditLedgerEntry = await ledgerModel.create([{
+        account : fromUserAccount._id,
+        amount : amount,
+        transaction : transaction._id,
+        type : "CREDIT",
+    }], { session })
+
+    // transaction.status = "COMPLETED";
+    await transaction.save({ session })
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json({
+        message : "Initial funds transaction created successfully",
+        transaction : transaction,
+    })
+}
+
+module.exports = {
         CreateTransactionController,
+        createInitialFundsTransaction
 }
 

@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
         unique : [true, "Email address already exists"],
         lowercase : true,
         match: [
-            /^\S+@\S+\.\S+$/,
+            /^\S+@\S+\.\S+$/,    // we use regex for this 
             'Please fill a valid email address'
           ]
     },
@@ -24,6 +24,12 @@ const userSchema = new mongoose.Schema({
         minlength: [6, "Password must be at least 6 characters long"],
         trim : true,
         select : false // this will prevent the password from being returned in any query by default, it returns only when we explicitly ask for it
+    },
+    systemUser : {
+        type : Boolean,
+        default : false,
+        immutable : true, // this field cannot be modified after the user is created, it will always be true for all users, we can use this field to differentiate between system users and regular users in the future if needed
+        select : false, // this will prevent the systemUser field from being returned in any query by default, it returns only when we explicitly ask for it
     }
 
 }, {
