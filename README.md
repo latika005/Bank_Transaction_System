@@ -1,7 +1,9 @@
 # Bank_Transaction_System
-# 📦 Project Overview
+| Project Overview |
 
 This project is a backend system built using Node.js and modern libraries to handle authentication, transactions, and secure communication. It focuses on reliability, security, and clean architecture.
+
+<img width="233" height="407" alt="image" src="https://github.com/user-attachments/assets/513778d8-ae8d-4c4a-add7-dd33dfa2e36a" />
 
 # Tech Stack & Dependencies
 
@@ -83,7 +85,7 @@ To securely send emails using Gmail SMTP, I used **Google OAuth2 authentication*
 
 ### Why this is important
 
-* Instead of using your Gmail password (unsafe ❌), OAuth2:
+* Instead of using your Gmail password ( unsafe ), OAuth2:
 
   * Provides **secure access tokens**
   * Allows controlled access to Gmail SMTP servers
@@ -123,9 +125,9 @@ Without idempotency:
 * ₹500 × 3 = ₹1500 gone 
 
 With idempotency:
-* Only ₹500 is charged ✅
+* Only ₹500 is charged 
 
-## 💡 Why it matters in this project
+## Why it matters in this project
 
 In transaction systems:
 
