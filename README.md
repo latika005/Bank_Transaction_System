@@ -1,5 +1,5 @@
 # Bank_Transaction_System
-| Project Overview |
+# Project Overview 
 
 This project is a backend system built using Node.js and modern libraries to handle authentication, transactions, and secure communication. It focuses on reliability, security, and clean architecture.
 
